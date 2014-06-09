@@ -14,20 +14,24 @@ def get_all_notes(posturl):
         for reblog in soup.find_all("li", "reblog"):
             reblogs.append(reblog.get_text())
     else:
+        # get notes from front page
+        for reblog in soup.find_all("li", "reblog"):
+            reblogs.append(reblog.get_text())
         while morenotes:
-            # get notes from front page
-            for reblog in soup.find_all("li", "reblog"):
-                reblogs.append(reblog.get_text())
-
             # get notes page url
             regex = u"'(/notes/[\w=?/]*)'"
             blogurl = "/".join(posturl.split("/")[0:3])
             notes_url = blogurl + re.search(regex, str(morenotes[0])).group(1)
+            print notes_url
             
             # request and soupify the next page of notes
             r = requests.get(notes_url)
             soup = BeautifulSoup(r.text)
             morenotes = soup.find_all("a", "more_notes_link")
+            
+            # get notes from current page
+            for reblog in soup.find_all("li", "reblog"):
+                reblogs.append(reblog.get_text())
             
     print len(reblogs)
     return reblogs
@@ -41,11 +45,10 @@ def reblogs_into_db(reblogs):
         p_match = re.search(p_regex, reblog)
         rb_match = re.search(rb_regex, reblog)
         if p_match:
-            poster = graph_db.create({"name": p_match.group(1)})[0]
+            poster = graph_db.get_or_create_indexed_node("People", "name", p_match.group(1), properties={"name": p_match.group(1)})
             poster.add_labels("poster")
         elif rb_match:
             reblogger = graph_db.get_or_create_indexed_node("People", "name", rb_match.group(1), properties={"name": rb_match.group(1)})
-            print reblogger
             reblogger.add_labels("reblogger")
             source = graph_db.get_or_create_indexed_node("People", "name", rb_match.group(2), properties={"name": rb_match.group(2)})
             source.add_labels("source")
